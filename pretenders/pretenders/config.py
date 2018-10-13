@@ -3,8 +3,11 @@ import os  # new
 
 class BaseConfig:
     """Base configuration"""
+    SECRET_KEY = 'my_precious'
     TESTING = False
+    BCRYPT_LOG_ROUNDS = 13
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    DEBUG = True
 
 
 class DevelopmentConfig(BaseConfig):

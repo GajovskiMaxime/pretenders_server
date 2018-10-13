@@ -1,62 +1,184 @@
 
 from flask import Blueprint, jsonify, request
 
-from api.models import User
+from api.models import User, BlacklistToken
+from flask_bcrypt import Bcrypt
 from sqlalchemy.exc import IntegrityError
+from dao.user_dao import add_user
 
-from pretenders import db
+from pretenders import db, create_app
 
 users_blueprint = Blueprint('users', __name__)
 
 
-@users_blueprint.route('/users', methods=['POST'])
-def add_user():
+@users_blueprint.route('/auth/register', methods=['POST'])
+def user_register():
+
     post_data = request.get_json()
-    response_object = {
-        'status': 'fail',
-        'message': 'Invalid payload.'
-    }
-    if not post_data:
-        return jsonify(response_object), 400
+
     username = post_data.get('username')
-    email = post_data.get('email')
+    password = post_data.get('password')
+
+    user = User.query.filter_by(username=username).first()
+
+    if user:
+        response_object = {
+            'status': 'fail',
+            'message': 'User already exists. Please Log in.',
+        }
+        return jsonify(response_object), 202
+
     try:
-        user = User.query.filter_by(email=email).first()
-        if not user:
-            db.session.add(User(username=username, email=email))
-            db.session.commit()
-            response_object['status'] = 'success'
-            response_object['message'] = f'{email} was added!'
-            return jsonify(response_object), 201
-        else:
-            response_object['message'] = 'Sorry. That email already exists.'
-            return jsonify(response_object), 400
-    except IntegrityError as e:
-        db.session.rollback()
-        return jsonify(response_object), 400
+        add_user(username, password)
+
+        response_object = {
+            'status': 'success',
+            'message': 'Successfully registered.'
+        }
+        return jsonify(response_object), 201
+    except Exception as e:
+        print(e)
+        response_object = {
+            'status': 'fail',
+            'message': 'Some error occurred. Please try again.'
+        }
+        return jsonify(response_object), 401
 
 
-@users_blueprint.route('/users/<user_id>', methods=['GET'])
-def get_single_user(user_id):
-    """Get single user details"""
-    response_object = {
-        'status': 'fail',
-        'message': 'User does not exist'
-    }
+@users_blueprint.route('/auth/login', methods=['POST'])
+def user_login():
+    post_data = request.get_json()
     try:
-        user = User.query.filter_by(id=int(user_id)).first()
+        username = post_data.get('username')
+        password = post_data.get('password')
+        user = User.query.filter_by(username=username).first()
         if not user:
+            response_object = {
+                'status': 'fail',
+                'message': 'User does not exist.'
+            }
             return jsonify(response_object), 404
-        else:
+
+        if not Bcrypt(create_app()).check_password_hash(user.password, password):
+            response_object = {
+                'status': 'fail',
+                'message': 'Wrong password.'
+            }
+            return jsonify(response_object), 401
+
+        auth_token = User.encode_auth_token(user.id)
+        if auth_token:
             response_object = {
                 'status': 'success',
-                'data': {
-                    'id': user.id,
-                    'username': user.username,
-                    'email': user.email,
-                    'active': user.active
-                }
+                'message': 'Successfully logged in.',
+                'auth_token': auth_token.decode()
             }
             return jsonify(response_object), 200
-    except ValueError:
-        return jsonify(response_object), 404
+
+    except Exception as e:
+        print(e)
+        response_object = {
+            'status': 'fail',
+            'message': 'Try again'
+        }
+        return jsonify(response_object), 500
+
+
+@users_blueprint.route('/auth/status', methods=['GET'])
+def user_status():
+    # get the auth token
+    auth_header = request.headers.get('Authorization')
+    if not auth_header:
+        response_object = {
+            'status': 'fail',
+            'message': 'Authorization header needed.'
+        }
+        return jsonify(response_object), 401
+    try:
+        auth_token = auth_header.split(" ")[1]
+    except IndexError:
+        response_object = {
+            'status': 'fail',
+            'message': 'Bearer token malformed.'
+        }
+        return jsonify(response_object), 401
+
+    if not auth_token:
+        response_object = {
+            'status': 'fail',
+            'message': 'Provide a valid auth token.'
+        }
+        return jsonify(response_object), 401
+
+    resp = User.decode_auth_token(auth_token)
+    if not isinstance(resp, int):
+        response_object = {
+            'status': 'fail',
+            'message': 'Invalid token'
+        }
+        return jsonify(response_object), 401
+
+    if BlacklistToken.check_blacklist(auth_token):
+        response_object = {
+            'status': 'fail',
+            'message': 'This token has expired.'
+        }
+        return jsonify(response_object), 401
+
+    user = User.query.filter_by(id=resp).first()
+    response_object = {
+        'status': 'success',
+        'data': user.serialize
+    }
+    return jsonify(response_object), 200
+
+
+@users_blueprint.route('/auth/logout', methods=['POST'])
+def user_logout():
+    auth_header = request.headers.get('Authorization')
+    if not auth_header:
+        response_object = {
+            'status': 'fail',
+            'message': 'Authorization header needed.'
+        }
+        return jsonify(response_object), 401
+    try:
+        auth_token = auth_header.split(" ")[1]
+    except IndexError:
+        response_object = {
+            'status': 'fail',
+            'message': 'Bearer token malformed.'
+        }
+        return jsonify(response_object), 401
+
+    if not auth_token:
+        response_object = {
+            'status': 'fail',
+            'message': 'Provide a valid auth token.'
+        }
+        return jsonify(response_object), 401
+
+    resp = User.decode_auth_token(auth_token)
+    if not isinstance(resp, int):
+        response_object = {
+            'status': 'fail',
+            'message': 'Invalid token'
+        }
+        return jsonify(response_object), 401
+
+    blacklist_token = BlacklistToken(token=auth_token)
+    try:
+        db.session.add(blacklist_token)
+        db.session.commit()
+        response_object = {
+            'status': 'success',
+            'message': 'Successfully logged out.'
+        }
+        return jsonify(response_object), 200
+
+    except Exception as e:
+        response_object = {
+            'status': 'fail',
+            'message': e
+        }
+        return jsonify(response_object), 200

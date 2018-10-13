@@ -1,0 +1,40 @@
+version: '3.6'
+
+services:
+
+  pretenders_server:
+    container_name: "pretenders_server"
+    build:
+      context: ./pretenders
+      dockerfile: Dockerfile-dev
+    command : python manage.py run -h 0.0.0.0
+    ports:
+      - 5001:5000
+    volumes:
+      - ./pretenders:/usr/src/app
+    environment:
+      - FLASK_APP=pretenders/__init__.py
+      - FLASK_ENV=development
+      - FLASK_DEBUG=1
+      - APP_SETTINGS=pretenders.config.DevelopmentConfig
+      - DATABASE_URL=postgres://postgres:postgres@pretenders_db:5432/users_dev
+      - DATABASE_TEST_URL=postgres://postgres:postgres@pretenders_db:5432/users_test
+    networks:
+      - pretenders_network
+
+
+  pretenders_db:
+      container_name: "pretenders_db"
+      build:
+        context: ./db
+        dockerfile: Dockerfile
+      ports:
+        - 5435:5432
+      environment:
+        - POSTGRES_USER=postgres
+        - POSTGRES_PASSWORD=postgres
+      networks:
+      - pretenders_network
+
+networks:
+   pretenders_network:
