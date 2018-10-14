@@ -2,6 +2,7 @@ import datetime
 
 import jwt
 from flask_bcrypt import Bcrypt
+from sqlalchemy import ForeignKey
 from sqlalchemy.sql import func
 
 from pretenders import db, create_app
@@ -88,22 +89,29 @@ class Contest(db.Model):
     close_date = db.Column(db.DateTime, nullable=True)
     end_date = db.Column(db.DateTime, nullable=True)
     nb_of_pretenders = db.Column(db.Integer, nullable=True)
-    nb_of_pretenders_max = db.Column(db.Integer, nullable=False, default=20)
-    nb_of_winners = db.Column(db.Integer, nullable=False, default=1)
+    nb_of_pretenders_max = db.Column(db.Integer, nullable=True)
+    nb_of_winners = db.Column(db.Integer, nullable=True)
     country = db.Column(db.String, nullable=False)
     title = db.Column(db.String, nullable=False)
     is_active = db.Column(db.Boolean, nullable=False, default=True)
 
-    def __init__(self, title, contest_type, country):
+    challenger_id = db.Column(db.Integer, ForeignKey('users.user_id'), nullable=False)
+
+    def __init__(self, title, challenger_id, contest_type, country,
+                 nb_of_winners=1, nb_of_pretenders_max=20):
         self.title = title
+        self.challenger_id = challenger_id
         self.contest_type = contest_type
         self.country = country
+        self.nb_of_pretenders_max = nb_of_pretenders_max
+        self.nb_of_winners = nb_of_winners
 
     @property
     def serialize(self):
         return {
             'contest_id':           self.contest_id,
-            'type':                 self.type,
+            'challenger_id':        self.challenger_id,
+            'contest_type':         self.contest_type,
             'created_at':           self.created_at,
             'close_date':           self.close_date,
             'end_date':             self.end_date,
