@@ -22,7 +22,7 @@ Docker is really all you need. That's all.
 
 Build the image:
 ```
-docker-compose up -d --build
+docker-compose -f docker-compose-dev.yml up --build
 ```
 
 \
@@ -47,7 +47,7 @@ ca6b523a9209        git_pretenders_db       "docker-entrypoint.s…"   2 hours a
 \
 Next you have to re/create the database:
 ```
-docker-compose run pretenders_server python manage.py recreate-database
+docker-compose -f docker-compose-dev.yml run pretenders_server python manage.py recreate-database
 ```
 
 \

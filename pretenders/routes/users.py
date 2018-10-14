@@ -4,7 +4,10 @@ from flask import Blueprint, jsonify, request
 from api.models import User, BlacklistToken
 from flask_bcrypt import Bcrypt
 from sqlalchemy.exc import IntegrityError
+
 from dao.user_dao import add_user
+from dao.blacklist_tokens_dao import verify_token_from_auth_header
+
 
 from pretenders import db, create_app
 
@@ -28,21 +31,8 @@ def user_register():
         }
         return jsonify(response_object), 202
 
-    try:
-        add_user(username, password)
-
-        response_object = {
-            'status': 'success',
-            'message': 'Successfully registered.'
-        }
-        return jsonify(response_object), 201
-    except Exception as e:
-        print(e)
-        response_object = {
-            'status': 'fail',
-            'message': 'Some error occurred. Please try again.'
-        }
-        return jsonify(response_object), 401
+    resp, code = add_user(username, password)
+    return jsonify(resp), code
 
 
 @users_blueprint.route('/auth/login', methods=['POST'])
@@ -66,7 +56,7 @@ def user_login():
             }
             return jsonify(response_object), 401
 
-        auth_token = User.encode_auth_token(user.id)
+        auth_token = User.encode_auth_token(user.user_id)
         if auth_token:
             response_object = {
                 'status': 'success',
@@ -86,50 +76,16 @@ def user_login():
 
 @users_blueprint.route('/auth/status', methods=['GET'])
 def user_status():
-    # get the auth token
     auth_header = request.headers.get('Authorization')
-    if not auth_header:
-        response_object = {
-            'status': 'fail',
-            'message': 'Authorization header needed.'
-        }
-        return jsonify(response_object), 401
-    try:
-        auth_token = auth_header.split(" ")[1]
-    except IndexError:
-        response_object = {
-            'status': 'fail',
-            'message': 'Bearer token malformed.'
-        }
-        return jsonify(response_object), 401
+    resp, code = verify_token_from_auth_header(auth_header)
+    if resp['status'] != 'success':
+        return jsonify(resp), code
 
-    if not auth_token:
-        response_object = {
-            'status': 'fail',
-            'message': 'Provide a valid auth token.'
-        }
-        return jsonify(response_object), 401
-
-    resp = User.decode_auth_token(auth_token)
-    if not isinstance(resp, int):
-        response_object = {
-            'status': 'fail',
-            'message': 'Invalid token'
-        }
-        return jsonify(response_object), 401
-
-    if BlacklistToken.check_blacklist(auth_token):
-        response_object = {
-            'status': 'fail',
-            'message': 'This token has expired.'
-        }
-        return jsonify(response_object), 401
-
-    user = User.query.filter_by(id=resp).first()
+    user = User.query.filter_by(user_id=resp['user_id']).first()
     response_object = {
         'status': 'success',
         'data': user.serialize
-    }
+    }, 200
     return jsonify(response_object), 200
 
 

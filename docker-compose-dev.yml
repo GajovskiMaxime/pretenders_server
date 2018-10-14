@@ -24,16 +24,16 @@ services:
 
 
   pretenders_db:
-      container_name: "pretenders_db"
-      build:
-        context: ./db
-        dockerfile: Dockerfile
-      ports:
-        - 5435:5432
-      environment:
-        - POSTGRES_USER=postgres
-        - POSTGRES_PASSWORD=postgres
-      networks:
+    container_name: "pretenders_db"
+    build:
+      context: ./db
+      dockerfile: Dockerfile
+    ports:
+      - 5435:5432
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    networks:
       - pretenders_network
 
 networks:

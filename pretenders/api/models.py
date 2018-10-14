@@ -11,7 +11,7 @@ class User(db.Model):
 
     __tablename__ = 'users'
 
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    user_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     username = db.Column(db.String, nullable=False)
     password = db.Column(db.String, nullable=False)
     gender = db.Column(db.Boolean, default=True, nullable=True)
@@ -66,7 +66,7 @@ class User(db.Model):
     @property
     def serialize(self):
         return {
-            'id':               self.id,
+            'user_id':          self.user_id,
             'username':         self.username,
             'gender':           self.gender,
             'birthdate':        self.birthdate,
@@ -74,7 +74,44 @@ class User(db.Model):
             'about_me':         self.about_me,
             'score':            self.score,
             'nb_of_tokens':     self.nb_of_tokens,
-            'registered_on ':   self.registered_on
+            'registered_on':    self.registered_on
+        }
+
+
+class Contest(db.Model):
+
+    __tablename__ = 'contest'
+
+    contest_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    contest_type = db.Column(db.String, nullable=False)
+    created_at = db.Column(db.DateTime, default=func.now(), nullable=False)
+    close_date = db.Column(db.DateTime, nullable=True)
+    end_date = db.Column(db.DateTime, nullable=True)
+    nb_of_pretenders = db.Column(db.Integer, nullable=True)
+    nb_of_pretenders_max = db.Column(db.Integer, nullable=False, default=20)
+    nb_of_winners = db.Column(db.Integer, nullable=False, default=1)
+    country = db.Column(db.String, nullable=False)
+    title = db.Column(db.String, nullable=False)
+    is_active = db.Column(db.Boolean, nullable=False, default=True)
+
+    def __init__(self, title, contest_type, country):
+        self.title = title
+        self.contest_type = contest_type
+        self.country = country
+
+    @property
+    def serialize(self):
+        return {
+            'contest_id':           self.contest_id,
+            'type':                 self.type,
+            'created_at':           self.created_at,
+            'close_date':           self.close_date,
+            'end_date':             self.end_date,
+            'nb_of_pretenders':     self.nb_of_pretenders,
+            'nb_of_pretenders_max': self.nb_of_pretenders_max,
+            'nb_of_winners':        self.nb_of_winners,
+            'country':              self.country,
+            'title':                self.title
         }
 
 
